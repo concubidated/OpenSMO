@@ -9,7 +9,7 @@ namespace OpenSMO {
         public static Hashtable GetSong(string Name, string Artist, string SubTitle) {
             Hashtable[] resCheck = MySql.Query("SELECT * FROM songs WHERE BINARY Name='" + Name + "' " +
                                              "AND BINARY Artist='" + Artist + "' " +
-                                             "AND BINARY SubTitle='" + SubTitle + "' limit 1");
+                                             "AND BINARY SubTitle='" + SubTitle + "' LIMIT 1");
 
             if (resCheck == null) return null;
             if (resCheck.Length == 1)
@@ -49,7 +49,7 @@ namespace OpenSMO {
                                                           "'" + Artist + "'," +
                                                           "'" + SubTitle + "')");
 
-                return MySql.Query("SELECT * FROM songs ORDER BY ID DESC LIMIT 0,1")[0];
+                return MySql.Query("SELECT * FROM songs ORDER BY \"ID\" DESC LIMIT 0,1")[0];
             } else if (Start) {
                 MySql.Query("UPDATE songs SET Played=Played+1 WHERE ID=" + song["ID"].ToString());
                 user.CurrentRoom.Reported = true;
@@ -95,11 +95,11 @@ namespace OpenSMO {
                     }
                 }
 
-                string playerSettings = MySql.AddSlashes(user.GamePlayerSettings);
+                string playerSettings = Sql.AddSlashes(user.GamePlayerSettings);
 
                 // Big-ass query right there...
                 if (!user.ShadowBanned) {
-                    MySql.Query("INSERT INTO stats(User,PlayerSettings,Song,Feet,Difficulty,Grade,Score,MaxCombo," +
+                    MySql.Query("INSERT INTO stats (User,PlayerSettings,Song,Feet,Difficulty,Grade,Score,MaxCombo," +
                         "Note_0,Note_1,Note_Mine,Note_Miss,Note_Barely,Note_Good,Note_Great,Note_Perfect,Note_Flawless,Note_NG,Note_Held) VALUES(" +
                         user.User_Table["ID"].ToString() + ",'" + playerSettings + "'," + songID.ToString() + "," + user.GameFeet.ToString() + "," + ((int)user.GameDifficulty).ToString() + "," + ((int)user.Grade).ToString() + "," + user.Score.ToString() + "," + user.MaxCombo.ToString() + "," +
                         user.Notes[0].ToString() + "," + user.Notes[1].ToString() + "," + user.Notes[2].ToString() + "," + user.Notes[3].ToString() + "," + user.Notes[4].ToString() + "," + user.Notes[5].ToString() + "," + user.Notes[6].ToString() + "," + user.Notes[7].ToString() + "," + user.Notes[8].ToString() + "," + user.Notes[9].ToString() + "," + user.Notes[10].ToString() + ")");

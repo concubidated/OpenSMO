@@ -90,18 +90,10 @@ namespace OpenSMO
       if (ServerConfig.Contains("Server_Version")) ServerVersion = (byte)int.Parse(ServerConfig.Get("Server_Version"));
       if (ServerConfig.Contains("Server_MaxPlayers")) ServerMaxPlayers = (byte)int.Parse(ServerConfig.Get("Server_MaxPlayers"));
 
-     // MySql.Filename = ServerConfig.Get("Database_File");
-     // MySql.Version = int.Parse(ServerConfig.Get("Database_Version"));
-     // MySql.Compress = bool.Parse(ServerConfig.Get("Database_Compressed"));
-      //MySql.Initialize();
       MySql.Host = ServerConfig.Get("MySql_Host");
       MySql.User = ServerConfig.Get("MySql_User");
       MySql.Password = ServerConfig.Get("MySql_Password");
       MySql.Database = ServerConfig.Get("MySql_Database");
-
-
-      //if (!Sql.Connected)
-        //AddLog("Please check your SQLite database.", true);
 
       ReloadScripts();
 
@@ -165,7 +157,6 @@ namespace OpenSMO
     public void UserThread()
     {
       while (true) {
-        //Sql.Update();
 
         try {
           for (int i = 0; i < Scripting.UpdateHooks.Count; i++) {
@@ -217,29 +208,16 @@ namespace OpenSMO
 
           try {
             string line = reader.ReadLine();
-
-            while (reader.ReadLine() != "") { }
-
             if (line != null) {
-              string[] requestParts = line.Split(' ')[1].Substring(1).Split(new char[] { '?' }, 2);
-              string request = requestParts[0];
-              string data = requestParts.Length == 2 ? Uri.UnescapeDataString(requestParts[1]).Replace('+', ' ') : "";
+              string request = line.Split(' ')[1].Substring(1);
               string[] parse = request.Split('/');
-
-              string roomID = "";
-              Room r = null;
 
               string responseBuffer = "";
               switch (parse[0]) {
                 case "l":
-                  if (IP != ServerConfig.Get("RTS_Trusted")) {
-                    responseBuffer = "[]";
-                    break;
-                  }
-
                   responseBuffer = "[";
                   foreach (Room room in Rooms) {
-                    if (!room.Secret && (room.Owner != null && !room.Owner.ShadowBanned)) {
+                    if (!room.Secret && !room.Owner.ShadowBanned) {
                       responseBuffer += "[";
                       responseBuffer += "\"" + room.ID + "\",";
                       responseBuffer += "\"" + JsonSafe(room.Name) + "\",";
@@ -259,8 +237,8 @@ namespace OpenSMO
                   break;
 
                 case "g":
-                  roomID = parse[1];
-                  r = null;
+                  string roomID = parse[1];
+                  Room r = null;
                   foreach (Room room in Rooms) {
                     if (room.ID == roomID) {
                       r = room;
@@ -299,42 +277,6 @@ namespace OpenSMO
                       responseBuffer += "]";
                     }
                   }
-                  break;
-
-                case "c":
-                  if (IP != ServerConfig.Get("RTS_Trusted")) {
-                    responseBuffer = "[]";
-                    break;
-                  }
-
-                  roomID = parse[1];
-
-                  Hashtable[] userRes = MySql.Query("SELECT * FROM \"users\" WHERE \"Username\"='" + MySql.AddSlashes(parse[2]) + "'");
-                  if (userRes.Length != 1) {
-                    break;
-                  }
-
-                  Hashtable u = userRes[0];
-
-                  r = null;
-                  foreach (Room room in Rooms) {
-                    if (room.ID == roomID) {
-                      r = room;
-                      break;
-                    }
-                  }
-
-                  if (r != null && !r.Secret) {
-                    string strName = u["Username"].ToString();
-
-                    for (int i = 0; i < Scripting.WebFormatHooks.Count; i++) {
-                      strName = Scripting.WebFormatHooks[i](u, strName);
-                    }
-
-                    SendChatAll(strName + ": " + data, r);
-                  }
-
-                  responseBuffer = "OK";
                   break;
               }
 

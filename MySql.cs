@@ -87,7 +87,6 @@ namespace OpenSMO
 				
 				MySqlDataReader reader = cmd.ExecuteReader();
 
-
       			while (reader.Read())
 				{
         			Hashtable row = new Hashtable();

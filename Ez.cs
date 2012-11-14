@@ -13,23 +13,18 @@ namespace OpenSMO
       MainClass.AddLog("Error in StreamHelper", true);
     }
 
-    private static void CloseHandler()
-    {
-      MainClass.AddLog("Connection closed during StreamHelper byte reading", true);
-    }
-
     public static byte ReadByte(BinaryReader stream)
     {
       try {
         return stream.ReadByte();
-      } catch { CloseHandler(); try { stream.Close(); } catch { ErrorHandler(); } return 0; }
+      } catch { try { stream.Close(); } catch { ErrorHandler(); } return 0; }
     }
 
     public static byte[] ReadBytes(BinaryReader stream, int amount)
     {
       try {
         return stream.ReadBytes(amount);
-      } catch { CloseHandler(); try { stream.Close(); } catch { ErrorHandler(); } return new byte[0]; }
+      } catch { try { stream.Close(); } catch { ErrorHandler(); } return new byte[0]; }
     }
 
     public static void WriteNT(BinaryWriter stream, string Str)
@@ -63,25 +58,15 @@ namespace OpenSMO
     public static short ReadInt16Regular(BinaryReader stream)
     {
       byte[] arr = ReadBytes(stream, 2);
-      if (arr.Length == 0) {
-        // NOTE: This is a special case when ReadBytes returns an empty array, this can happen in case of a connection close.
-        return 0;
-      } else {
-        Array.Reverse(arr);
-        return BitConverter.ToInt16(arr, 0);
-      }
+      Array.Reverse(arr);
+      return BitConverter.ToInt16(arr, 0);
     }
 
     public static ushort ReadUInt16Regular(BinaryReader stream)
     {
       byte[] arr = ReadBytes(stream, 2);
-      if (arr.Length == 0) {
-        // NOTE: This is a special case when ReadBytes returns an empty array, this can happen in case of a connection close.
-        return 0;
-      } else {
-        Array.Reverse(arr);
-        return BitConverter.ToUInt16(arr, 0);
-      }
+      Array.Reverse(arr);
+      return BitConverter.ToUInt16(arr, 0);
     }
 
     public static void WriteInt32Regular(BinaryWriter stream, int data)
@@ -94,13 +79,8 @@ namespace OpenSMO
     public static int ReadInt32Regular(BinaryReader stream)
     {
       byte[] arr = ReadBytes(stream, 4);
-      if (arr.Length == 0) {
-        // NOTE: This is a special case when ReadBytes returns an empty array, this can happen in case of a connection close.
-        return 0;
-      } else {
-        Array.Reverse(arr);
-        return BitConverter.ToInt32(arr, 0);
-      }
+      Array.Reverse(arr);
+      return BitConverter.ToInt32(arr, 0);
     }
   }
 

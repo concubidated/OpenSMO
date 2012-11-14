@@ -772,12 +772,10 @@ namespace OpenSMO
           return;
         } else if (smoLoginCheck.Length == 0) {
           if (bool.Parse(mainClass.ServerConfig.Get("Allow_Registration"))) {
-            MySql.Query("INSERT INTO users (Username,Password,Email,Rank,XP) VALUES(\"" + Sql.AddSlashes(smoUsername) + 
-"\",\"" + MySql.AddSlashes(smoPassword) + "\",\"\",0,0)");
+            MySql.Query("INSERT INTO users (Username,Password,Email,Rank,XP) VALUES(\'" + MySql.AddSlashes(smoUsername) + "\',\'" + MySql.AddSlashes(smoPassword) + "\',\'\',0,0)");
             MainClass.AddLog(smoUsername + " is now registered with hash " + smoPassword);
 
-            User_Table = MySql.Query("SELECT * FROM users WHERE Username='" + MySql.AddSlashes(smoUsername) + "' AND Password='" + 
-MySql.AddSlashes(smoPassword) + "'")[0];
+            User_Table = MySql.Query("SELECT * FROM users WHERE Username='" + MySql.AddSlashes(smoUsername) + "' AND Password='" + MySql.AddSlashes(smoPassword) + "'")[0];
             User_ID = (int)User_Table["ID"];
             User_Name = (string)User_Table["Username"];
             User_Rank = (UserRank)User_Table["Rank"];
