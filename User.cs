@@ -130,8 +130,15 @@ namespace OpenSMO
     public NSNotes NoteHit = NSNotes.Miss;
     public double NoteOffset = 0d;
     public ushort NoteOffsetRaw = 0;
-
+    public float Tpnt = 0;
+    public float Tmaxpnt = 0;
+    public float percentf = 0;
+    public int timing = 0;
+    public int perfmarv = 0;
+    public int toasty = 0;
     public int GameFeet = 0;
+    public string percent = "";
+    public int servcombo = 0;
     public NSDifficulty GameDifficulty = NSDifficulty.Beginner;
     public string GamePlayerSettings = "";
     public string CourseTitle = "";
@@ -163,6 +170,7 @@ namespace OpenSMO
         return badCount == 0;
       }
     }
+
 
     public User(MainClass mainClass, TcpClient tcpClient)
     {
@@ -257,9 +265,15 @@ namespace OpenSMO
     {
       ez.Write1((byte)(mainClass.ServerOffset + NSCommand.NSCCM));
       ez.WriteNT(" " + (Message.StartsWith("|c0") ? "" : Func.ChatColor("ffffff")) + Message + " ");
+      MainClass.AddLog("Chat: " + OpenSMO.User.Utf8Decode(Message));
       ez.SendPack();
     }
 
+    public void SendRoomChatMessage(string Message)
+    {
+      mainClass.SendChatAll(NameFormat() + " got " + Message , CurrentRoom);
+    }
+    
     public void SendRoomList()
     {
       ez.Write1((byte)(mainClass.ServerOffset + NSCommand.NSCSMOnline));
@@ -534,11 +548,95 @@ namespace OpenSMO
       }
     }
 
+    public static int GetServCombo(int NoteHit, int servcombo)
+    {
+      switch (NoteHit)
+      {
+          case 10:
+            servcombo++;
+            break;
+	        case 9:
+            break;
+          case 8:
+            servcombo++;
+            break;
+          case 7:
+            servcombo++;
+            break;
+          case 6:
+            servcombo++;
+            break;
+          default:
+            servcombo=0;
+            break;
+      }
+      return servcombo;
+    }
+
+    public static int GetPerfMarv(int NoteHit, int perfmarv, int jump)
+    {
+      switch (NoteHit)
+      {
+        case 10:
+          perfmarv =  perfmarv + 1 + jump;
+          break;
+		    case 8:
+          perfmarv =  perfmarv + 1 + jump;
+          break;
+		    case 7:
+          perfmarv =  perfmarv + 1 + jump;
+          break;
+		    default:
+          perfmarv =  0;
+		      break;
+      }
+    return perfmarv;
+    }
+
+    public static int GetTiming(int NoteHit, double NoteOffset, int timing)
+    {
+    	//Default timing windows
+    	double smarv  = -.02259;
+    	double sperf  = -.04509;
+    	double sgreat = -.09009;
+    	double sgood  = -.13509;
+    	double sboo   = -.18909;
+    	switch (NoteHit)
+      {
+        case 8:
+  		    if ((NoteOffset < smarv) || (NoteOffset > (smarv * -1d)))
+            timing++;
+  		    break;
+        
+        case 7:
+          if ((NoteOffset < sperf) || (NoteOffset > (sperf * -1d)))
+            timing++;
+          break;
+
+        case 6:
+          if ((NoteOffset < sgreat) || (NoteOffset > (sgreat * -1d)))
+            timing++;
+          break;
+
+        case 5:
+          if ((NoteOffset < sgood) || (NoteOffset > (sgood * -1d)))
+            timing++;
+          break;
+
+        case 4:
+          if ((NoteOffset < sboo) || (NoteOffset > (sboo * -1d))) 
+            timing++;
+          break;
+      }
+      return timing;
+    }
+
+
     public void NSCGSU()
     {
       if (!RequiresAuthentication()) return;
 
-      if (Playing && !Spectating) {
+      if ((Playing && !Spectating) && (this.CurrentRoom != null)) {
         NSNotes gsuCtr;
         NSGrades gsuGrade;
         int gsuScore, gsuCombo, gsuLife;
@@ -558,13 +656,39 @@ namespace OpenSMO
         NoteHit = gsuCtr;
         NoteOffset = gsuOffset;
 
-        Notes[(int)gsuCtr]++;
+        try {
+          Notes[(int)gsuCtr]++;
+        } catch (Exception e) {
+            MainClass.AddLog("gsuCtr:" + gsuCtr);
+            foreach(var note in Notes) {
+              MainClass.AddLog(note.ToString());
+            }
+            Console.WriteLine("{0} Exception caught.", e);
+        }
+
         Grade = gsuGrade;
         Score = gsuScore;
         Combo = gsuCombo;
+	
+      	int jump = 0;
+        servcombo = GetServCombo((int)NoteHit, servcombo);
+      	jump = Combo - servcombo;
+      	
+      	if ( jump > 3 )
+      		jump=0;
 
+      	servcombo = Combo;
+      	timing = GetTiming((int)NoteHit, NoteOffset, timing);
+      	perfmarv = GetPerfMarv((int)NoteHit, perfmarv, jump);
+      	if ( perfmarv > 249 )
+      	{
+      		toasty++;
+      		perfmarv = 0;
+      	}
+	
         if (gsuCombo > MaxCombo)
           MaxCombo = gsuCombo;
+
       } else
         ez.Discard();
     }
@@ -575,50 +699,68 @@ namespace OpenSMO
 
       if (Playing && !Spectating)
       {
-          if (CurrentRoom != null)
-          { // Required for SMOP v2
-              CurrentRoom.Reported = false;
+        if (CurrentRoom != null)
+        { // Required for SMOP v2
+          CurrentRoom.Reported = false;
 
-              User[] origColumnUsers = GetUsersInRoom();
-              User[] columnUsers = (from user in origColumnUsers where user.Playing orderby user.SMOScore descending select user).ToArray();
+          User[] origColumnUsers = GetUsersInRoom();
+          User[] columnUsers = (from user in origColumnUsers where user.Playing orderby user.SMOScore descending select user).ToArray();
 
-              ez.Write1((byte)(mainClass.ServerOffset + NSCommand.NSCGON));
-              ez.Write1((byte)columnUsers.Length);
+          ez.Write1((byte)(mainClass.ServerOffset + NSCommand.NSCGON));
+          ez.Write1((byte)columnUsers.Length);
 
-              // Name index
-             for (int i = 0; i < columnUsers.Length; i++) 
-                 {
-                 for (int j = 0; j < origColumnUsers.Length; j++)
-                 {
-                     if (origColumnUsers[j] == columnUsers[i])
-                                     ez.Write1((byte)j);
-                 }
-              }
-              // Name index
-//              for (int i = 0; i < columnUsers.Length; i++) { for (int j = 0; j < origColumnUsers.Length; j++) { if (origColumnUsers[j] == columnUsers[i]) { ez.Write1((byte)id); }
-              // Score
-              for (int i = 0; i < columnUsers.Length; i++) ez.Write4(columnUsers[i].Score);
-              // Grade
-              for (int i = 0; i < columnUsers.Length; i++) ez.Write1((byte)columnUsers[i].Grade);
-              // Difficulty
-              for (int i = 0; i < columnUsers.Length; i++) ez.Write1((byte)columnUsers[i].GameDifficulty);
-
-              // Flawless to Miss
-              for (int j = 0; j < 6; j++)
-                  for (int i = 0; i < columnUsers.Length; i++) ez.Write2((short)columnUsers[i].Notes[(int)NSNotes.Flawless - j]);
-              // Held
-              for (int i = 0; i < columnUsers.Length; i++) ez.Write2((short)columnUsers[i].Notes[(int)NSNotes.Held]);
-              // Max combo
-              for (int i = 0; i < columnUsers.Length; i++) ez.Write2((short)columnUsers[i].MaxCombo);
-
-              // Player settings
-              for (int i = 0; i < columnUsers.Length; i++) ez.WriteNT(columnUsers[i].GamePlayerSettings);
-
-              ez.SendPack();
+          // Name index
+         for (int i = 0; i < columnUsers.Length; i++) 
+             {
+             for (int j = 0; j < origColumnUsers.Length; j++)
+             {
+                 if (origColumnUsers[j] == columnUsers[i])
+                                 ez.Write1((byte)j);
+             }
           }
+          // Score
+          for (int i = 0; i < columnUsers.Length; i++) ez.Write4(columnUsers[i].Score);
+          // Grade
+          for (int i = 0; i < columnUsers.Length; i++) ez.Write1((byte)columnUsers[i].Grade);
+          // Difficulty
+          for (int i = 0; i < columnUsers.Length; i++) ez.Write1((byte)columnUsers[i].GameDifficulty);
+
+          // Flawless to Miss
+          for (int j = 0; j < 6; j++)
+              for (int i = 0; i < columnUsers.Length; i++) ez.Write2((short)columnUsers[i].Notes[(int)NSNotes.Flawless - j]);
+          // Held
+          for (int i = 0; i < columnUsers.Length; i++) ez.Write2((short)columnUsers[i].Notes[(int)NSNotes.Held]);
+          // Max combo
+          for (int i = 0; i < columnUsers.Length; i++) ez.Write2((short)columnUsers[i].MaxCombo);
+
+          // Player settings + percent
+          for (int i = 0; i < columnUsers.Length; i++)
+          {
+            int marv = columnUsers[i].Notes[(int)NSNotes.Flawless];
+            int perf = columnUsers[i].Notes[(int)NSNotes.Perfect];
+            int grea = columnUsers[i].Notes[(int)NSNotes.Great];
+            int good = columnUsers[i].Notes[(int)NSNotes.Good];
+            int boo  = columnUsers[i].Notes[(int)NSNotes.Barely];
+            int miss = columnUsers[i].Notes[(int)NSNotes.Miss];
+            int ok   = columnUsers[i].Notes[(int)NSNotes.Held];
+            int ng   = columnUsers[i].Notes[(int)NSNotes.NG];
+            Tpnt = (3 * marv) + (2 * perf) + grea - (4 * boo) - (8 * miss) + (6 * ok);
+            Tmaxpnt = 3 * (marv + perf + grea + good + boo + miss) + 6 * (ok + ng);
+            percentf = (Tpnt/Tmaxpnt)*100F;
+            percent = percentf.ToString("n2");
+            columnUsers[i].percent=percent;
+            string settings = columnUsers[i].GamePlayerSettings;
+            string percset = percent + "%, " + settings;
+      		
+            if (timing > 2)
+              percset = percset + ", TIMING";
+            
+            ez.WriteNT(percset);
+          }
+          ez.SendPack();
+        }
 
         if (NoteCount > 0) {
-          if (FullCombo) SendChatMessage(Func.ChatColor("00aa00") + "FULL COMBO!!");
           Data.AddStats(this);
         }
       } else {
@@ -626,6 +768,12 @@ namespace OpenSMO
           SendChatMessage(Func.ChatColor("aa0000") + "Spectator mode activated, no stats gained.");
       }
     }
+
+    public static string Utf8Decode(string utf8me)
+    {
+        return Encoding.UTF8.GetString(Encoding.GetEncoding(28591).GetBytes(utf8me));
+    }
+
 
     public void NSCRSG()
     {
@@ -641,6 +789,7 @@ namespace OpenSMO
       string pickName = ez.ReadNT();
       string pickArtist = ez.ReadNT();
       string pickAlbum = ez.ReadNT();
+
 
       switch (pickResponseStatus) {
         case 0: // Player has song
@@ -757,6 +906,8 @@ namespace OpenSMO
           User_Name = (string)User_Table["Username"];
           User_Rank = (UserRank)User_Table["Rank"];
 
+		MySql.Query("INSERT INTO connectionlog (userid,username,password,ip,result,clientversion) VALUES('" + User_ID + "','" + smoUsername + "','" + smoPassword + "','" + User_IP + "','succeeded','" + User_Game + "')");
+
           ez.Write1((byte)(mainClass.ServerOffset + NSCommand.NSCSMOnline));
           ez.Write2(0);
           ez.WriteNT("Login success!");
@@ -797,6 +948,7 @@ namespace OpenSMO
         }
 
         MainClass.AddLog(smoUsername + " tried logging in with hash " + smoPassword + " but failed");
+        MySql.Query("INSERT INTO connectionlog (userid,username,password,ip,result,clientversion) VALUES('" + User_ID + "','" + smoUsername + "','" + smoPassword + "','" + User_IP + "','failed','" + User_Game + "')");
 
         ez.Write1((byte)(mainClass.ServerOffset + NSCommand.NSCSMOnline));
         ez.Write2(1);

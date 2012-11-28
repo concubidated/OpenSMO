@@ -11,6 +11,7 @@ namespace OpenSMO {
                                              "AND BINARY Artist='" + Artist + "' " +
                                              "AND BINARY SubTitle='" + SubTitle + "' LIMIT 1");
 
+            MainClass.AddLog("A DB select was made on (Name,Artist,Subtitle) VALUES('" + Name + "','" + Artist + "','" + SubTitle + "')");
             if (resCheck == null) return null;
             if (resCheck.Length == 1)
                 return resCheck[0];
@@ -22,10 +23,10 @@ namespace OpenSMO {
             if (user.CurrentRoom == null || user.CurrentRoom.CurrentSong == null || user.CurrentRoom.Reported)
                 return null;
 
-            string Name = MySql.AddSlashes(user.CurrentRoom.CurrentSong.Name);
-            string Artist = MySql.AddSlashes(user.CurrentRoom.CurrentSong.Artist);
-            string SubTitle = MySql.AddSlashes(user.CurrentRoom.CurrentSong.SubTitle);
-
+            string Name = MySql.AddSlashes(OpenSMO.User.Utf8Decode(user.CurrentRoom.CurrentSong.Name));
+            string Artist = MySql.AddSlashes(OpenSMO.User.Utf8Decode(user.CurrentRoom.CurrentSong.Artist));
+            string SubTitle = MySql.AddSlashes(OpenSMO.User.Utf8Decode(user.CurrentRoom.CurrentSong.SubTitle));
+		
             Hashtable song = Data.GetSong(Name, Artist, SubTitle);
 
             if (user.ShadowBanned) {
@@ -71,16 +72,16 @@ namespace OpenSMO {
 
         public static void AddStats(User user) {
             if (user.CurrentRoom == null)
-                return;
+        	   return;
 
             if (user.CurrentRoom.CurrentSong == null)
-                return;
+	           return;
 
             user.CurrentRoom.Status = RoomStatus.Ready;
 
-            string Name = MySql.AddSlashes(user.CurrentRoom.CurrentSong.Name);
-            string Artist = MySql.AddSlashes(user.CurrentRoom.CurrentSong.Artist);
-            string SubTitle = MySql.AddSlashes(user.CurrentRoom.CurrentSong.SubTitle);
+            string Name = MySql.AddSlashes(OpenSMO.User.Utf8Decode(user.CurrentRoom.CurrentSong.Name));
+            string Artist = MySql.AddSlashes(OpenSMO.User.Utf8Decode(user.CurrentRoom.CurrentSong.Artist));
+            string SubTitle = MySql.AddSlashes(OpenSMO.User.Utf8Decode(user.CurrentRoom.CurrentSong.SubTitle));
 
             int songID = 0;
             Hashtable song = Data.GetSong(Name, Artist, SubTitle);
@@ -100,19 +101,87 @@ namespace OpenSMO {
                 // Big-ass query right there...
                 if (!user.ShadowBanned) {
                     MySql.Query("INSERT INTO stats (User,PlayerSettings,Song,Feet,Difficulty,Grade,Score,MaxCombo," +
-                        "Note_0,Note_1,Note_Mine,Note_Miss,Note_Barely,Note_Good,Note_Great,Note_Perfect,Note_Flawless,Note_NG,Note_Held) VALUES(" +
+                        "Note_0,Note_1,Note_Mine,Note_Miss,Note_Barely,Note_Good,Note_Great,Note_Perfect,Note_Flawless,Note_NG,Note_Held,Toasty,timing) VALUES(" +
                         user.User_Table["ID"].ToString() + ",'" + playerSettings + "'," + songID.ToString() + "," + user.GameFeet.ToString() + "," + ((int)user.GameDifficulty).ToString() + "," + ((int)user.Grade).ToString() + "," + user.Score.ToString() + "," + user.MaxCombo.ToString() + "," +
-                        user.Notes[0].ToString() + "," + user.Notes[1].ToString() + "," + user.Notes[2].ToString() + "," + user.Notes[3].ToString() + "," + user.Notes[4].ToString() + "," + user.Notes[5].ToString() + "," + user.Notes[6].ToString() + "," + user.Notes[7].ToString() + "," + user.Notes[8].ToString() + "," + user.Notes[9].ToString() + "," + user.Notes[10].ToString() + ")");
+                        user.Notes[0].ToString() + "," + user.Notes[1].ToString() + "," + user.Notes[2].ToString() + "," + user.Notes[3].ToString() + "," + user.Notes[4].ToString() + "," + user.Notes[5].ToString() + "," + user.Notes[6].ToString() + "," + user.Notes[7].ToString() + "," + user.Notes[8].ToString() + "," + user.Notes[9].ToString() + "," + user.Notes[10].ToString() + "," + user.toasty + "," + user.timing + ")");
                 }
             }
 
+            MainClass.AddLog("User ID  " +user.User_Table["ID"].ToString()  + "'s Final Timing: " + user.timing);
+            MainClass.AddLog("User ID  " +user.User_Table["ID"].ToString()  + "'s Toasty Count: " + user.toasty);
             // Give player XP
             int XP = 0;
             for (int i = 3; i <= 8; i++)
                 XP += (i - 3) * user.Notes[i];
+            
             XP /= 6;
+            if ( user.timing > 2 )
+            {
+                user.toasty = 0;
+                XP = 0;
+            }
 
-            user.SendChatMessage("You gained " + Func.ChatColor("aaaa00") + XP.ToString() + Func.ChatColor("ffffff") + " XP!");
+            int pretoastyxp = XP;	
+            int toastyxp = (user.toasty * 50);
+            XP += toastyxp;
+
+            int marv = user.Notes[8];
+            int perf = user.Notes[7];
+            int grea = user.Notes[6];
+            int good = user.Notes[5];
+            int boo  = user.Notes[4];
+            int miss = user.Notes[3];
+            int ok   = user.Notes[10];
+            int ng   = user.Notes[9];
+
+            float Tpnt = (3 * marv) + (2 * perf) + grea - (4 * boo) - (8 * miss) + (6 * ok);
+            float Tmaxpnt = 3 * (marv + perf + grea + good + boo + miss) + 6 * (ok + ng);
+            float percentf = (Tpnt/Tmaxpnt)*100F;
+            string percent = percentf.ToString("n2");
+
+            string percentageq = "round(100.00/(3 * (Note_Flawless + Note_Perfect + Note_Great + Note_Good + Note_Barely + Note_Miss) + 6 * (Note_Held + Note_NG))*((3 * Note_Flawless) + (2 * Note_Perfect) + Note_Great - (4 * Note_Barely) - (8 * Note_Miss) + (6 * Note_Held)),3)";
+
+            Hashtable[] smoPBestQuery = MySql.Query("select count(*) as 'count' from stats where song = " + songID.ToString() + " and user = " + user.User_Table["ID"].ToString() + " and Difficulty = '" + ((int)user.GameDifficulty).ToString() + "' and Feet = '" + user.GameFeet.ToString() + "'  and " + percentageq +" > '" + percent  + "'");
+            Hashtable PBStats = smoPBestQuery[0];
+            int count = (int)PBStats["count"];
+            count = count + 1;
+
+            Hashtable[] smoPBestTotalQuery = MySql.Query("select count(*) as 'count' from stats where song = " + songID.ToString() + " and user = " + user.User_Table["ID"].ToString() + " and Difficulty = '" + ((int)user.GameDifficulty).ToString() + "' and Feet = '" + user.GameFeet.ToString() + "'");
+            Hashtable oPBStats = smoPBestTotalQuery[0];
+            int ocount = (int)oPBStats["count"];
+
+
+            Hashtable[] smoTBestQuery = MySql.Query("select count(*) as 'count' from stats where song = " + songID.ToString() + " and Difficulty = '" + ((int)user.GameDifficulty).ToString() + "' and Feet = '" + user.GameFeet.ToString() + "'  and " + percentageq +" > '" + percent  + "'");
+            Hashtable TBStats = smoTBestQuery[0];
+            int tcount = (int)TBStats["count"];
+            tcount = tcount + 1;
+
+            Hashtable[] smoTBestTotalQuery = MySql.Query("select count(*) as 'count' from stats where song = " + songID.ToString() + " and Difficulty = '" + ((int)user.GameDifficulty).ToString() + "' and Feet = '" + user.GameFeet.ToString() + "'");
+            Hashtable oTBStats = smoTBestTotalQuery[0];
+            int tocount = (int)oTBStats["count"];
+
+            string bestmessage= Func.ChatColor("aaaa00") + percent + "%" + Func.ChatColor("ffffff") + " PB: #"+ Func.ChatColor("aaaa00") + count + "/" + ocount + Func.ChatColor("ffffff") +" TB: #" + Func.ChatColor("aaaa00") + tcount + "/" + tocount + Func.ChatColor("ffffff");
+		
+            if (user.toasty > 0)
+            {
+                bestmessage = bestmessage + " " + Func.ChatColor("aaaa00") + pretoastyxp + "+" + toastyxp + Func.ChatColor("ffffff") + " XP Gained  - " + Func.ChatColor("aaaa00") + user.toasty + Func.ChatColor("ffffff") + " Toasty(s)";
+            } else {
+                bestmessage = bestmessage + " " + Func.ChatColor("aaaa00") + pretoastyxp + Func.ChatColor("ffffff") + " XP Gained ";
+            }
+
+            if ((miss == 0) && (boo == 0) && (good == 0) && ((marv + perf + grea) > 1))
+            {
+                bestmessage = bestmessage + " -FC";
+            }
+
+            if ( user.timing > 2 )
+            {
+                bestmessage = bestmessage + " -TIMING";
+            }
+
+            user.SendRoomChatMessage(bestmessage);
+            user.toasty = 0;
+            user.timing = 0;
 
             if (!user.ShadowBanned)
                 MySql.Query("UPDATE users SET XP=XP+" + XP.ToString() + " WHERE ID=" + user.User_ID.ToString());

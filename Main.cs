@@ -189,7 +189,7 @@ namespace OpenSMO
 
     public string JsonSafe(string str)
     {
-      return str.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
+      return User.Utf8Decode(str).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
     }
 
     public void RTSThread()

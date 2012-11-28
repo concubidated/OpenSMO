@@ -25,7 +25,7 @@ namespace OpenSMO
 		{
 			string connectionString;
 			connectionString = "server=" + Host + ";" + "database=" + 
-				Database + ";" + "userid=" + User + ";" + "password=" + Password + ";";
+				Database + ";" + "userid=" + User + ";" + "password=" + Password + ";charset=utf8;";
 			
 			conn = new MySqlConnection(connectionString);
 		}

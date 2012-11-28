@@ -32,15 +32,6 @@ namespace OpenSMO
       } catch { CloseHandler(); try { stream.Close(); } catch { ErrorHandler(); } return new byte[0]; }
     }
 
-    public static void WriteNT(BinaryWriter stream, string Str)
-    {
-      byte[] writeBytes = new byte[Str.Length + 1];
-      for (int i = 0; i < Str.Length; i++)
-        writeBytes[i] = (byte)Str[i];
-      writeBytes[Str.Length] = 0;
-      stream.Write(writeBytes);
-    }
-
     public static string ReadNT(BinaryReader stream)
     {
       string ret = "";
@@ -180,12 +171,23 @@ namespace OpenSMO
       WriteArr(arr);
     }
 
+
     public void WriteNT(string data)
     {
       byte[] writeBytes = new byte[data.Length + 1];
       for (int i = 0; i < data.Length; i++)
         writeBytes[i] = (byte)data[i];
       writeBytes[data.Length] = 0;
+      WriteArr(writeBytes);
+    }
+
+
+    public void WriteNTu(string data)
+    {
+      byte[] utf8writeBytes = UTF8Encoding.UTF8.GetBytes(data);
+      byte[] writeBytes = new byte[utf8writeBytes.Length + 1];
+      utf8writeBytes.CopyTo(writeBytes, 0);
+      writeBytes[utf8writeBytes.Length] = 0;
       WriteArr(writeBytes);
     }
 
@@ -226,5 +228,6 @@ namespace OpenSMO
       LastPacketSize -= ret.Length + 1;
       return ret;
     }
+    
   }
 }
